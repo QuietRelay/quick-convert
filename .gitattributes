@@ -1,2 +1,2 @@
-convert text eol=lf
+qconvert text eol=lf
 *.py text eol=lf

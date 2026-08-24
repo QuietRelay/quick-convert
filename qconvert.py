@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 """
-convert.py - Quick unit conversions from the terminal.
+qconvert.py - Quick unit conversions from the terminal.
 
 Usage:
-    python convert.py temp 72f          # 72 Fahrenheit -> Celsius
-    python convert.py temp 22c          # 22 Celsius -> Fahrenheit
-    python convert.py temp 300k         # 300 Kelvin -> Celsius and Fahrenheit
-    python convert.py 72f               # shorthand: temp is assumed
-    python convert.py                   # interactive prompt
+    python qconvert.py temp 72f          # 72 Fahrenheit -> Celsius
+    python qconvert.py temp 22c          # 22 Celsius -> Fahrenheit
+    python qconvert.py temp 300k         # 300 Kelvin -> Celsius and Fahrenheit
+    python qconvert.py 72f               # shorthand: temp is assumed
+    python qconvert.py                   # interactive prompt
 
 Works identically in Windows cmd.exe, PowerShell, and macOS/Linux terminals
 since it only relies on the Python standard library (no dependencies).
+
+Named "qconvert" (not "convert") because Windows ships a built-in
+System32\\convert.exe (FAT->NTFS disk conversion) that would otherwise
+shadow this command on PATH.
 
 New converters can be added as additional subcommands (see CONVERTERS below)
 without touching the existing temp logic.

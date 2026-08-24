@@ -12,27 +12,31 @@ subcommands over time.
 ## Usage
 
 ```bash
-python convert.py temp 72f      # 72 Fahrenheit -> Celsius and Kelvin
-python convert.py temp 22c      # 22 Celsius -> Fahrenheit and Kelvin
-python convert.py temp 300k     # 300 Kelvin -> Celsius and Fahrenheit
-python convert.py 72f           # shorthand: "temp" is assumed for now
+python qconvert.py temp 72f      # 72 Fahrenheit -> Celsius and Kelvin
+python qconvert.py temp 22c      # 22 Celsius -> Fahrenheit and Kelvin
+python qconvert.py temp 300k     # 300 Kelvin -> Celsius and Fahrenheit
+python qconvert.py 72f           # shorthand: "temp" is assumed for now
 ```
 
 Interactive mode (no arguments):
 
 ```bash
-python convert.py
+python qconvert.py
 ```
 
-## Installing it as a plain `convert` command
+## Installing it as a plain `qconvert` command
 
 Clone the repo, then put this folder on your `PATH`.
+
+The command is named `qconvert`, not `convert` — Windows ships a built-in
+`System32\convert.exe` (FAT-to-NTFS disk conversion) that would otherwise
+shadow a plain `convert` on PATH.
 
 **macOS / Linux:**
 
 ```bash
 git clone https://github.com/QuietRelay/quick-convert.git
-chmod +x quick-convert/convert
+chmod +x quick-convert/qconvert
 echo 'export PATH="$PATH:'"$(pwd)"'/quick-convert"' >> ~/.zshrc   # or ~/.bashrc
 ```
 
@@ -50,14 +54,14 @@ git clone https://github.com/QuietRelay/quick-convert.git
 Open a new terminal afterward, then run:
 
 ```bash
-convert temp 72f
+qconvert temp 72f
 ```
 
 ## Adding a new converter
 
 Add a `run_<name>(raw: str)` function and register it in the `CONVERTERS`
-dict in `convert.py`. It'll automatically become available as
-`convert <name> <value>`.
+dict in `qconvert.py`. It'll automatically become available as
+`qconvert <name> <value>`.
 
 ## License
 
