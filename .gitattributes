@@ -1,2 +1,3 @@
 qconvert text eol=lf
 *.py text eol=lf
+qc text eol=lf

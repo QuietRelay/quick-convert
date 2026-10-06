@@ -23,7 +23,34 @@ qconvert weight 12oz    # naming the category is optional
 qconvert --help         # list every supported unit
 ```
 
-Run `qconvert` with no arguments for an interactive prompt.
+`qc` is a shorter name for the same command: `qc 5ft` works the same way.
+
+### Interactive menu
+
+Run `qconvert` (or `qc`) with no arguments for a menu:
+
+```
+╭───────────────────╮
+│   Quick Convert   │
+╰───────────────────╯
+
+  Type a value like 72f, 5ft or 2 cups, or pick a category:
+
+  1  Temperature       f, c
+  2  Length            in, ft, yd, mi, mm, cm, m, km
+  3  Weight            oz, lb, g, kg
+  4  Volume / cooking  tsp, tbsp, fl oz, cup, pt, qt, gal, ml, l
+  5  Speed             mph, kph
+  6  Data size         B, KB, MB, GB, TB, KiB, MiB, GiB, TiB
+
+  ? help   q quit
+```
+
+Type a value straight away, or pick a number to see that category's units
+and examples. In the temperature menu a plain number (`72`) is shown both
+as F and as C. `b` goes back to the menu, `?` shows help, and `q` quits.
+Results are in color when the terminal supports it; set `NO_COLOR=1` to
+turn that off.
 
 Supported units (case doesn't matter, and a space before the unit is fine):
 
@@ -58,7 +85,7 @@ shadow a plain `convert` on PATH.
 
 ```bash
 git clone https://github.com/QuietRelay/quick-convert.git
-chmod +x quick-convert/qconvert
+chmod +x quick-convert/qconvert quick-convert/qc
 echo 'export PATH="$PATH:'"$(pwd)"'/quick-convert"' >> ~/.zshrc   # or ~/.bashrc
 ```
 
@@ -76,7 +103,7 @@ git clone https://github.com/QuietRelay/quick-convert.git
 Open a new terminal afterward, then run:
 
 ```bash
-qconvert temp 72f
+qc            # opens the menu
 ```
 
 ## Adding a unit

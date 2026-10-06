@@ -11,7 +11,7 @@ Usage:
     qconvert 65mph               # speed:       65 mph = 104.6 kph
     qconvert 72f 5ft 150lb       # several values at once
     qconvert weight 12oz         # optional category name (temp, length, ...)
-    qconvert                     # interactive prompt
+    qconvert                     # interactive menu
     qconvert --help              # list every supported unit
 
 The category is worked out from the unit, so naming it is optional.
@@ -28,6 +28,7 @@ it should convert to in TARGETS.
 """
 
 import math
+import os
 import re
 import sys
 
@@ -118,6 +119,11 @@ CATEGORIES = {
     "volume": "volume", "vol": "volume", "cooking": "volume", "cook": "volume",
     "speed": "speed",
     "data": "data", "size": "data",
+}
+
+CATEGORY_NAMES = {
+    "temp": "temperature", "length": "length", "weight": "weight",
+    "volume": "volume", "speed": "speed", "data": "data size",
 }
 
 EXAMPLES = {
@@ -276,15 +282,20 @@ def format_quantity(value, unit: str, is_input: bool = False) -> str:
     return f"{number} {label}"
 
 
-def convert_text(raw: str, category=None) -> str:
-    """Convert one 'number unit' string to a display line. Raises ValueError."""
+def convert_parts(raw: str, category=None) -> list:
+    """Convert one 'number unit' string to ['5 ft', '1.52 m', ...]. Raises ValueError."""
     value, unit = parse_value_unit(raw)
     unit_category = UNITS[unit][0]
     if category and unit_category != category:
-        raise ValueError(f"'{raw.strip()}' is a {unit_category} unit, not {category}.")
+        raise ValueError(f"'{raw.strip()}' is a {CATEGORY_NAMES[unit_category]} unit, not {CATEGORY_NAMES[category]}.")
     parts = [format_quantity(value, unit, is_input=True)]
     parts += [format_quantity(v, u) for v, u in convert(value, unit)]
-    return " = ".join(parts)
+    return parts
+
+
+def convert_text(raw: str, category=None) -> str:
+    """Convert one 'number unit' string to a plain display line. Raises ValueError."""
+    return " = ".join(convert_parts(raw, category))
 
 
 def split_values(text: str) -> list:
@@ -299,23 +310,72 @@ def split_values(text: str) -> list:
     return re.split(r"\s+(?=[-+]?\.?\d)", text)
 
 
-def run_line(text: str) -> bool:
+# --- Terminal styling -------------------------------------------------------
+
+class Style:
+    """ANSI colors, switched off when output isn't a terminal or NO_COLOR is set."""
+
+    def __init__(self, enabled: bool):
+        def code(c):
+            return c if enabled else ""
+        self.reset = code("\033[0m")
+        self.bold = code("\033[1m")
+        self.dim = code("\033[2m")
+        self.red = code("\033[31m")
+        self.green = code("\033[32m")
+        self.yellow = code("\033[33m")
+        self.cyan = code("\033[36m")
+
+
+def _make_style() -> Style:
+    enabled = sys.stdout.isatty() and "NO_COLOR" not in os.environ
+    if enabled and os.name == "nt":
+        os.system("")  # turns on ANSI escape handling in older Windows consoles
+    return Style(enabled)
+
+
+def _can_print(text: str) -> bool:
+    try:
+        text.encode(sys.stdout.encoding or "ascii")
+        return True
+    except (UnicodeEncodeError, LookupError):
+        return False
+
+
+S = _make_style()
+
+
+def print_result(parts: list) -> None:
+    first, rest = parts[0], parts[1:]
+    sep = f" {S.dim}={S.reset} "
+    print(f"{S.bold}{first}{S.reset}{sep}" + sep.join(f"{S.green}{p}{S.reset}" for p in rest))
+
+
+def print_error(message: str) -> None:
+    print(f"{S.red}{message}{S.reset}")
+
+
+def run_line(text: str, category=None) -> bool:
     """Convert everything on one line of input, printing results. Returns False on any error."""
     words = text.split(None, 1)
-    category = None
     if words and words[0].lower() in CATEGORIES:
         category = CATEGORIES[words[0].lower()]
         text = words[1] if len(words) > 1 else ""
         if not text.strip():
-            print(f"Give a value to convert after '{words[0]}', e.g. {words[0]} {EXAMPLES[category]}.")
+            print_error(f"Give a value to convert after '{words[0]}', e.g. {words[0]} {EXAMPLES[category]}.")
             return False
 
     ok = True
     for chunk in split_values(text):
+        # In the temperature menu a bare number is shown both ways.
+        if category == "temp" and re.fullmatch(r"\s*[-+]?[\d,]*\.?\d+\s*", chunk):
+            print_result(convert_parts(chunk + "f"))
+            print_result(convert_parts(chunk + "c"))
+            continue
         try:
-            print(convert_text(chunk, category))
+            print_result(convert_parts(chunk, category))
         except ValueError as e:
-            print(e)
+            print_error(str(e))
             ok = False
     return ok
 
@@ -326,7 +386,8 @@ qconvert - quick unit conversions
 Usage:
   qconvert <number><unit> [more values...]   e.g. qconvert 72f 5ft 150lb
   qconvert <category> <number><unit>         category name is optional
-  qconvert                                   interactive prompt
+  qconvert                                   interactive menu
+  (qc works anywhere qconvert does)
 
 Units (case doesn't matter; a space before the unit is fine):
   temp     f, c
@@ -341,6 +402,102 @@ Notes: "oz" is weight; use "fl oz" for volume. "m" is meters; use "mi" for miles
 """
 
 
+# --- Interactive menu -------------------------------------------------------
+
+# (category, menu label, units shown, example values)
+MENU = [
+    ("temp", "Temperature", "f, c", "72f  -40c  98.6f"),
+    ("length", "Length", "in, ft, yd, mi, mm, cm, m, km", "5ft  180cm  26.2mi"),
+    ("weight", "Weight", "oz, lb, g, kg", "150lb  12oz  500g"),
+    ("volume", "Volume / cooking", "tsp, tbsp, fl oz, cup, pt, qt, gal, ml, l", "2 cups  3 tbsp  250ml"),
+    ("speed", "Speed", "mph, kph", "65mph  100kph"),
+    ("data", "Data size", "B, KB, MB, GB, TB, KiB, MiB, GiB, TiB", "4.7GB  1TB  16GiB"),
+]
+
+QUIT_WORDS = ("q", "quit", "exit")
+HELP_WORDS = ("h", "help", "?")
+BACK_WORDS = ("b", "back", "m", "menu")
+
+
+def print_header() -> None:
+    title = "Quick Convert"
+    if _can_print("╭─╮│╰╯"):
+        top, side, bottom = "╭" + "─" * 19 + "╮", "│", "╰" + "─" * 19 + "╯"
+    else:
+        top, side, bottom = "+" + "-" * 19 + "+", "|", "+" + "-" * 19 + "+"
+    print(f"{S.cyan}{top}{S.reset}")
+    print(f"{S.cyan}{side}{S.reset}   {S.bold}{title}{S.reset}   {S.cyan}{side}{S.reset}")
+    print(f"{S.cyan}{bottom}{S.reset}")
+
+
+def print_menu() -> None:
+    print()
+    print(f"  Type a value like {S.bold}72f{S.reset}, {S.bold}5ft{S.reset} or {S.bold}2 cups{S.reset}, or pick a category:")
+    print()
+    width = max(len(label) for _, label, _, _ in MENU) + 2
+    for i, (_, label, units, _) in enumerate(MENU, 1):
+        print(f"  {S.yellow}{i}{S.reset}  {label:<{width}}{S.dim}{units}{S.reset}")
+    print()
+    print(f"  {S.yellow}?{S.reset} help   {S.yellow}q{S.reset} quit")
+    print()
+
+
+def print_category_intro(index: int) -> None:
+    _, label, units, examples = MENU[index]
+    print()
+    print(f"  {S.bold}{label}{S.reset}  {S.dim}{units}{S.reset}")
+    print(f"  Try: {examples}")
+    if MENU[index][0] == "temp":
+        print(f"  {S.dim}A plain number is shown both ways.{S.reset}")
+    print(f"  {S.dim}b back to menu, q quit{S.reset}")
+    print()
+
+
+def interactive() -> None:
+    try:
+        import readline  # noqa: F401  (arrow-key history on macOS/Linux)
+        has_readline = True
+    except ImportError:
+        has_readline = False  # Windows consoles have their own history
+
+    def color_prompt(text):
+        if not S.cyan:
+            return text
+        if has_readline:
+            # Mark the color codes as zero-width so line editing lines up.
+            return f"\001{S.cyan}\002{text}\001{S.reset}\002"
+        return f"{S.cyan}{text}{S.reset}"
+
+    print_header()
+    print_menu()
+    current = None  # index into MENU while inside a category
+    while True:
+        prompt = f"{MENU[current][1].split()[0].lower()}> " if current is not None else "> "
+        try:
+            raw = input(color_prompt(prompt)).strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+        if not raw:
+            continue
+        word = raw.lower()
+        if word in QUIT_WORDS:
+            break
+        if word in HELP_WORDS:
+            print()
+            print(HELP)
+            continue
+        if word in BACK_WORDS:
+            current = None
+            print_menu()
+            continue
+        if current is None and word.isdigit() and 1 <= int(word) <= len(MENU):
+            current = int(word) - 1
+            print_category_intro(current)
+            continue
+        run_line(raw, MENU[current][0] if current is not None else None)
+
+
 def main() -> None:
     args = sys.argv[1:]
 
@@ -349,23 +506,7 @@ def main() -> None:
         return
 
     if not args:
-        print("Quick Convert")
-        print("Enter a value like 72f, 5ft, 150lb, 2 cups, 65mph, or 4.7GB.")
-        print("Type 'help' for all units, 'q' to quit.\n")
-        while True:
-            try:
-                raw = input("> ").strip()
-            except (EOFError, KeyboardInterrupt):
-                print()
-                break
-            if not raw:
-                continue
-            if raw.lower() in ("q", "quit", "exit"):
-                break
-            if raw.lower() in ("h", "help", "?"):
-                print(HELP)
-                continue
-            run_line(raw)
+        interactive()
         return
 
     if not run_line(" ".join(args)):
