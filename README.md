@@ -1,9 +1,8 @@
 # quick-convert
 
-A tiny, dependency-free command-line tool for fast unit conversions. Started
-with temperature (F/C/K) because constantly converting between Fahrenheit
-and Celsius gets old fast. Built to grow — more converters can be added as
-subcommands over time.
+A tiny, dependency-free command-line tool for fast unit conversions:
+temperature, length, weight, volume/cooking, speed, and data sizes. It works
+out what kind of conversion you want from the unit you type.
 
 ## Requirements
 
@@ -12,17 +11,40 @@ subcommands over time.
 ## Usage
 
 ```bash
-python qconvert.py temp 72f      # 72 Fahrenheit -> Celsius and Kelvin
-python qconvert.py temp 22c      # 22 Celsius -> Fahrenheit and Kelvin
-python qconvert.py temp 300k     # 300 Kelvin -> Celsius and Fahrenheit
-python qconvert.py 72f           # shorthand: "temp" is assumed for now
+qconvert 72f            # 72F = 22.2C
+qconvert 5ft            # 5 ft = 1.52 m = 152.4 cm
+qconvert 180cm          # 180 cm = 70.87 in = 5 ft 10.9 in
+qconvert 150lb          # 150 lb = 68.04 kg
+qconvert 2 cups         # 2 cups = 473.2 ml = 32 tbsp = 16 fl oz
+qconvert 65mph          # 65 mph = 104.6 kph
+qconvert 4.7GB          # 4.7 GB = 4.38 GiB
+qconvert 72f 5ft 150lb  # several values at once, one line each
+qconvert weight 12oz    # naming the category is optional
+qconvert --help         # list every supported unit
 ```
 
-Interactive mode (no arguments):
+Run `qconvert` with no arguments for an interactive prompt.
 
-```bash
-python qconvert.py
-```
+Supported units (case doesn't matter, and a space before the unit is fine):
+
+| Category | Units |
+| --- | --- |
+| temp | `f`, `c` |
+| length | `in`, `ft`, `yd`, `mi`, `mm`, `cm`, `m`, `km` |
+| weight | `oz`, `lb`, `g`, `kg` |
+| volume | `tsp`, `tbsp`, `fl oz`, `cup`, `pt`, `qt`, `gal`, `ml`, `l` (US measures) |
+| speed | `mph`, `kph` (or `km/h`) |
+| data | `B`, `KB`, `MB`, `GB`, `TB` (1000-based) and `KiB`, `MiB`, `GiB`, `TiB` (1024-based) |
+
+Common spellings work too (`feet`, `lbs`, `cups`, `tablespoons`, ...). `oz` is
+weight; use `fl oz` for volume. `m` is meters; use `mi` for miles.
+
+Data sizes: drives are sold in 1000-based GB, but Windows reports 1024-based
+units while labelling them "GB". That's why a "1 TB" drive shows up as about
+931 GB in Explorer: `qconvert 1TB` gives `1 TB = 931.3 GiB`.
+
+If you run `qconvert.py` directly instead of installing the command, use
+`python qconvert.py ...` in place of `qconvert ...`.
 
 ## Installing it as a plain `qconvert` command
 
@@ -57,11 +79,20 @@ Open a new terminal afterward, then run:
 qconvert temp 72f
 ```
 
-## Adding a new converter
+## Adding a unit
 
-Add a `run_<name>(raw: str)` function and register it in the `CONVERTERS`
-dict in `qconvert.py`. It'll automatically become available as
-`qconvert <name> <value>`.
+In `qconvert.py`:
+
+1. Add it to `UNITS` with its category and its size in that category's base
+   unit (meters, grams, milliliters, km/h, or bytes).
+2. Add any other spellings to `ALIASES`.
+3. Say what it should convert to in `TARGETS`.
+
+## Running the tests
+
+```bash
+python -m unittest
+```
 
 ## License
 
