@@ -93,28 +93,40 @@ echo 'export PATH="$PATH:'"$(pwd)"'/quick-convert"' >> ~/.zshrc   # or ~/.bashrc
 
 ```powershell
 git clone https://github.com/QuietRelay/quick-convert.git
-$dir  = (Resolve-Path .\quick-convert).Path
-$user = [string][Environment]::GetEnvironmentVariable('Path', 'User')
-$have = @($user -split ';' | Where-Object { $_ } | ForEach-Object { [Environment]::ExpandEnvironmentVariables($_.Trim().Trim('"')).TrimEnd('\','/') })
-if ($have -notcontains $dir.TrimEnd('\','/')) {
-    $new = (@($user.TrimEnd(';'), $dir) | Where-Object { $_ }) -join ';'
-    [Environment]::SetEnvironmentVariable('Path', $new, 'User')
+$dir = (Resolve-Path .\quick-convert).Path
+$sub = 'Environment'
+$key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($sub, $true)
+try {
+    $raw  = [string]$key.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+    $kind = if ($key.GetValueNames() -contains 'Path') { $key.GetValueKind('Path') } else { 'ExpandString' }
+    $have = @($raw -split ';' | Where-Object { $_ } | ForEach-Object { [Environment]::ExpandEnvironmentVariables($_.Trim().Trim('"')).TrimEnd('\','/') })
+    if ($have -notcontains $dir.TrimEnd('\','/')) {
+        $new = (@($raw.TrimEnd(';'), $dir) | Where-Object { $_ }) -join ';'
+        $key.SetValue('Path', $new, $kind)
+    }
+} finally {
+    if ($key) { $key.Close() }
 }
 ```
 
 > Avoid `setx` for editing `PATH` on Windows — it silently truncates the
 > value at 1024 characters, which will corrupt the rest of your PATH if it's
-> already long. `[Environment]::SetEnvironmentVariable` has no such limit.
+> already long. Writing the registry value directly has no such limit.
 
-> The snippet reads only your **User** `PATH`, adds the folder at the end if it
-> isn't already there (ignoring case and a trailing `\`), and writes nothing
-> otherwise, so it is safe to run twice. Don't build the new value from
-> `$env:PATH`: that is the combined machine + user + session `PATH`, and saving
-> it as the User value copies every machine entry into it. The change applies
-> to programs started afterwards, so open a new terminal; the current one and
-> anything already running keep the old `PATH`. Windows expands any `%VARIABLE%`
-> entries in your User `PATH` when PowerShell reads it, so they are saved as
-> plain paths (same folders, different text).
+> The Windows snippet reads only your **User** `PATH`, exactly as stored, adds
+> the folder at the end if it isn't already there (ignoring case, quotes, a
+> trailing `\` and `%VARIABLE%` forms), and writes nothing otherwise, so it is
+> safe to run twice. Existing entries, their order, any `%VARIABLE%` text and
+> the value's registry type are left as they were, and it needs no
+> administrator rights. Don't build the new value from `$env:PATH`: that is the
+> combined machine + user + session `PATH`, and saving it as the User value
+> copies every machine entry into it. The `GetEnvironmentVariable` /
+> `SetEnvironmentVariable` pair isn't safe for this either: it expands
+> `%VARIABLE%` entries on read and saves the result as plain text. The change
+> applies to programs started afterwards, so open a new terminal; the current
+> one and anything already running keep the old `PATH`. The snippet doesn't
+> notify Windows of the change, so a program started from the Start menu or
+> Explorer may need you to sign out and back in first.
 
 Open a new terminal afterward, then run:
 

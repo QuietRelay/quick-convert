@@ -80,16 +80,20 @@ class ReadmePathGuidanceTests(unittest.TestCase):
         readme = (Path(__file__).with_name("README.md")).read_text(encoding="utf-8")
         return readme, readme.split("**Windows (PowerShell or cmd):**")[1].split("```powershell")[1].split("```")[0]
 
-    def test_windows_snippet_reads_only_the_user_path_and_checks_first(self):
+    def test_windows_snippet_edits_the_raw_user_value_and_checks_first(self):
         readme, block = self.windows_block()
-        self.assertNotIn("$env:PATH", block)
-        self.assertNotIn("$env:Path", block)
-        self.assertIn("GetEnvironmentVariable('Path', 'User')", block)
-        self.assertIn("-notcontains", block)
-        self.assertEqual(block.count("SetEnvironmentVariable("), 1)
-        self.assertIn("'User')", block)
-        self.assertLess(block.index("-notcontains"), block.index("SetEnvironmentVariable("))
-        self.assertIn("open a new terminal", readme.lower())
+        for bad in ("$env:PATH", "$env:Path", "GetEnvironmentVariable", "SetEnvironmentVariable", "QUIETRELAY_PATH_REFRESH"):
+            self.assertNotIn(bad, block, bad)
+        for good in ("CurrentUser.OpenSubKey($sub, $true)", "$sub = 'Environment'", "DoNotExpandEnvironmentNames",
+                     "GetValueKind('Path')", "-notcontains", "$key.SetValue('Path', $new, $kind)",
+                     "} finally {", "if ($key) { $key.Close() }"):
+            self.assertIn(good, block, good)
+        self.assertEqual(block.count("SetValue("), 1)
+        self.assertLess(block.index("-notcontains"), block.index("SetValue("))
+        self.assertLess(block.index("SetValue("), block.index("} finally {"))
+        lower = readme.lower()
+        self.assertIn("open a new terminal", lower)
+        self.assertIn("sign out", lower)
         self.assertIn("setx", readme)   # the truncation warning stays
 
 
