@@ -93,12 +93,28 @@ echo 'export PATH="$PATH:'"$(pwd)"'/quick-convert"' >> ~/.zshrc   # or ~/.bashrc
 
 ```powershell
 git clone https://github.com/QuietRelay/quick-convert.git
-[Environment]::SetEnvironmentVariable('PATH', "$env:PATH;$(Resolve-Path .\quick-convert)", 'User')
+$dir  = (Resolve-Path .\quick-convert).Path
+$user = [string][Environment]::GetEnvironmentVariable('Path', 'User')
+$have = @($user -split ';' | Where-Object { $_ } | ForEach-Object { [Environment]::ExpandEnvironmentVariables($_.Trim().Trim('"')).TrimEnd('\','/') })
+if ($have -notcontains $dir.TrimEnd('\','/')) {
+    $new = (@($user.TrimEnd(';'), $dir) | Where-Object { $_ }) -join ';'
+    [Environment]::SetEnvironmentVariable('Path', $new, 'User')
+}
 ```
 
 > Avoid `setx` for editing `PATH` on Windows — it silently truncates the
 > value at 1024 characters, which will corrupt the rest of your PATH if it's
 > already long. `[Environment]::SetEnvironmentVariable` has no such limit.
+
+> The snippet reads only your **User** `PATH`, adds the folder at the end if it
+> isn't already there (ignoring case and a trailing `\`), and writes nothing
+> otherwise, so it is safe to run twice. Don't build the new value from
+> `$env:PATH`: that is the combined machine + user + session `PATH`, and saving
+> it as the User value copies every machine entry into it. The change applies
+> to programs started afterwards, so open a new terminal; the current one and
+> anything already running keep the old `PATH`. Windows expands any `%VARIABLE%`
+> entries in your User `PATH` when PowerShell reads it, so they are saved as
+> plain paths (same folders, different text).
 
 Open a new terminal afterward, then run:
 
